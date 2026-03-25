@@ -158,8 +158,8 @@ function addProduct() {
     brand: "Marke", wifi: "Verfügbar", price: 0, technical_image: "", features: [], description: "",
     pricing: {
       basePrices: {},
-      roomSizeCosts: {"35m²": 0, "55m²": 0, "75m²": 0},
       locationCosts: {floor: 0, "wall-up-to-2.50m": 45, "wall-over-2.50m": 100},
+      locationLabels: {"floor": "Boden", "wall-up-to-2.50m": "Wand (bis 2,50m)", "wall-over-2.50m": "Wand (über 2,50m)"},
       additionalOptions: [
         {key:"dacharbeiten",label:"Dacharbeiten",price:250},
         {key:"assemblyWithin7Days",label:"Montage innerhalb von 7 Tagen",price:100},
@@ -210,15 +210,23 @@ function saveEditorToProduct() {
   });
   p.pricing.basePrices = Object.keys(bp).length > 0 ? bp : undefined;
 
-  // roomSizeCosts
-  const rc = {};
-  f.querySelectorAll('[data-rc-key]').forEach(el => { rc[el.dataset.rcKey] = parseInt(el.value) || 0; });
-  p.pricing.roomSizeCosts = rc;
-
-  // locationCosts
+  // locationCosts (dynamic)
   const lc = {};
-  f.querySelectorAll('[data-lc-key]').forEach(el => { lc[el.dataset.lcKey] = parseInt(el.value) || 0; });
+  f.querySelectorAll('.loc-row').forEach(row => {
+    const label = row.querySelector('.loc-label').value.trim();
+    const price = parseInt(row.querySelector('.loc-price').value) || 0;
+    const key = row.dataset.locKey || labelToKey(label);
+    if(label) lc[key] = price;
+  });
   p.pricing.locationCosts = lc;
+  // Store label mapping
+  const lcLabels = {};
+  f.querySelectorAll('.loc-row').forEach(row => {
+    const label = row.querySelector('.loc-label').value.trim();
+    const key = row.dataset.locKey || labelToKey(label);
+    if(label) lcLabels[key] = label;
+  });
+  p.pricing.locationLabels = lcLabels;
 
   // additionalOptions
   const opts = [];
@@ -238,9 +246,11 @@ function renderEditor() {
   const p = products[editingIndex];
   const pr = p.pricing || {};
   const bp = pr.basePrices || {};
-  const rc = pr.roomSizeCosts || {"35m²":0,"55m²":0,"75m²":0};
   const lc = pr.locationCosts || {floor:0,"wall-up-to-2.50m":45,"wall-over-2.50m":100};
+  const lcLabels = pr.locationLabels || {"floor":"Boden","wall-up-to-2.50m":"Wand (bis 2,50m)","wall-over-2.50m":"Wand (über 2,50m)"};
   const opts = pr.additionalOptions || [];
+
+  const locLabels = Object.assign({"floor":"Boden","wall-up-to-2.50m":"Wand (bis 2,50m)","wall-over-2.50m":"Wand (über 2,50m)"}, lcLabels);
 
   const basePriceConfigs = [
     ["35m²","1x 35m²"],["55m²","1x 55m²"],["75m²","1x 75m²"],
@@ -250,8 +260,6 @@ function renderEditor() {
     ["35m²+35m²+75m²","2x 35m² + 75m²"],["35m²+55m²+55m²","35m² + 2x 55m²"],
     ["35m²+55m²+75m²","35m² + 55m² + 75m²"],["55m²+55m²+55m²","3x 55m²"]
   ];
-
-  const locLabels = {"floor":"Boden","wall-up-to-2.50m":"Wand (bis 2,50m)","wall-over-2.50m":"Wand (über 2,50m)"};
 
   document.getElementById('productEditor').innerHTML = `
     <div class="card">
@@ -296,26 +304,18 @@ function renderEditor() {
       </div>
 
       <div class="section">
-        <h3>Zimmergrößen-Aufpreis (Fallback)</h3>
-        <p style="font-size:12px;color:#888;margin-bottom:12px;">Nur wenn kein fester Grundpreis definiert ist.</p>
-        ${Object.entries(rc).map(([size,cost]) => `
-          <div class="row">
-            <span class="label">${size}:</span>
-            <input type="number" data-rc-key="${size}" value="${cost}" style="width:110px;margin:0;">
-            <span class="unit">€</span>
-          </div>
-        `).join('')}
-      </div>
-
-      <div class="section">
         <h3>Standort Außeneinheit</h3>
-        ${Object.entries(lc).map(([key,cost]) => `
-          <div class="row">
-            <span class="label">${locLabels[key]||key}:</span>
-            <input type="number" data-lc-key="${key}" value="${cost}" style="width:110px;margin:0;">
-            <span class="unit">€</span>
-          </div>
-        `).join('')}
+        <div id="locContainer">
+          ${Object.entries(lc).map(([key,cost]) => `
+            <div class="row loc-row" data-loc-key="${esc(key)}">
+              <input class="loc-label" value="${esc(locLabels[key]||key)}" placeholder="Name" style="flex:1;margin:0;">
+              <input class="loc-price" type="number" value="${cost}" style="width:110px;margin:0;">
+              <span class="unit">€</span>
+              <button class="btn btn-red btn-sm" onclick="this.parentElement.remove()" style="padding:4px 10px;">X</button>
+            </div>
+          `).join('')}
+        </div>
+        <button class="btn btn-green btn-sm" onclick="addLocation()" style="margin-top:8px;">+ Standort hinzufügen</button>
       </div>
 
       <div class="section">
@@ -347,6 +347,24 @@ function renderEditor() {
       </div>
     </div>
   `;
+}
+
+function labelToKey(label) {
+  return label.toLowerCase().replace(/[^a-z0-9äöüß]/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,'') || 'option_' + Date.now();
+}
+
+function addLocation() {
+  const c = document.getElementById('locContainer');
+  const div = document.createElement('div');
+  div.className = 'row loc-row';
+  div.dataset.locKey = 'loc_' + Date.now();
+  div.innerHTML = `
+    <input class="loc-label" value="Neuer Standort" placeholder="Name" style="flex:1;margin:0;">
+    <input class="loc-price" type="number" value="0" style="width:110px;margin:0;">
+    <span class="unit">€</span>
+    <button class="btn btn-red btn-sm" onclick="this.parentElement.remove()" style="padding:4px 10px;">X</button>
+  `;
+  c.appendChild(div);
 }
 
 function addOption() {
