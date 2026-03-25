@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KlimaNRW - Produkt Admin</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #333; }
+    .header { background: #2c4587; color: white; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
+    .header h1 { font-size: 20px; }
+    .container { max-width: 900px; margin: 24px auto; padding: 0 16px; }
+    .card { background: white; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 16px; }
+    .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; transition: opacity 0.2s; }
+    .btn:hover { opacity: 0.85; }
+    .btn-primary { background: #2c4587; color: white; }
+    .btn-green { background: #22c55e; color: white; }
+    .btn-red { background: #ef4444; color: white; }
+    .btn-gray { background: #6b7280; color: white; }
+    .btn-orange { background: #f59e0b; color: white; }
+    .btn-sm { padding: 6px 14px; font-size: 13px; }
+    input, select, textarea { width: 100%; padding: 9px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; margin-bottom: 8px; }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: #2c4587; box-shadow: 0 0 0 2px rgba(44,69,135,0.15); }
+    input[type="number"] { width: 110px; }
+    label { font-weight: 600; font-size: 13px; color: #555; display: block; margin-bottom: 4px; margin-top: 12px; }
+    .section { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+    .section h3 { font-size: 16px; margin-bottom: 12px; color: #2c4587; }
+    .row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+    .row span.label { width: 220px; font-size: 14px; flex-shrink: 0; }
+    .row span.unit { font-size: 13px; color: #888; }
+    .product-item { display: flex; justify-content: space-between; align-items: center; padding: 14px; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 10px; background: white; }
+    .product-item .info { flex: 1; }
+    .product-item .info strong { font-size: 15px; }
+    .product-item .info .meta { font-size: 13px; color: #888; margin-top: 4px; }
+    .product-item .actions { display: flex; gap: 8px; }
+    .msg { padding: 12px; border-radius: 8px; margin-bottom: 16px; font-size: 14px; }
+    .msg-success { background: #dcfce7; color: #166534; }
+    .msg-info { background: #dbeafe; color: #1e40af; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .start-screen { text-align: center; padding: 60px 20px; }
+    .start-screen h2 { font-size: 24px; margin-bottom: 16px; }
+    .start-screen p { color: #666; margin-bottom: 24px; max-width: 500px; margin-left: auto; margin-right: auto; }
+    .drop-zone { border: 2px dashed #d1d5db; border-radius: 12px; padding: 40px; margin: 20px auto; max-width: 500px; cursor: pointer; transition: border-color 0.2s; }
+    .drop-zone:hover, .drop-zone.drag-over { border-color: #2c4587; background: #f0f4ff; }
+    .hidden { display: none; }
+    @media (max-width: 640px) {
+      .grid-2 { grid-template-columns: 1fr; }
+      .row span.label { width: 140px; }
+      .product-item { flex-direction: column; gap: 10px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>KlimaNRW Produkt Admin</h1>
+  <div id="headerBtns" class="hidden" style="display:flex;gap:8px;">
+    <button class="btn btn-orange btn-sm" onclick="backToList()">Zurück</button>
+    <button class="btn btn-green btn-sm" onclick="downloadJSON()">JSON herunterladen</button>
+  </div>
+</div>
+
+<div class="container">
+  <!-- Start Screen -->
+  <div id="startScreen" class="start-screen">
+    <h2>Produkt-Daten bearbeiten</h2>
+    <p>Lade deine aktuelle productData.json hoch, bearbeite die Produkte, und lade die geänderte Datei herunter.</p>
+    <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+      <p style="font-size:16px;color:#555;">productData.json hier reinziehen<br>oder klicken zum Auswählen</p>
+    </div>
+    <input type="file" id="fileInput" accept=".json" class="hidden" onchange="handleFile(event)">
+    <p style="margin-top:16px;color:#888;font-size:13px;">Oder: <button class="btn btn-primary btn-sm" onclick="loadFromURL()">Direkt von klimanrw.de laden</button></p>
+  </div>
+
+  <!-- Product List -->
+  <div id="productList" class="hidden">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h2 style="font-size:20px;">Produkte ({count})</h2>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-green btn-sm" onclick="addProduct()">+ Neues Produkt</button>
+        <button class="btn btn-primary btn-sm" onclick="downloadJSON()">JSON herunterladen</button>
+      </div>
+    </div>
+    <div id="productItems"></div>
+  </div>
+
+  <!-- Product Editor -->
+  <div id="productEditor" class="hidden"></div>
+</div>
+
+<script>
+let products = [];
+let editingIndex = -1;
+
+// Drag and drop
+const dropZone = document.getElementById('dropZone');
+dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.classList.remove('drag-over'); if(e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); });
+
+function handleFile(e) { if(e.target.files[0]) loadFile(e.target.files[0]); }
+
+function loadFile(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      products = JSON.parse(e.target.result);
+      showProductList();
+    } catch(err) { alert('Fehler beim Lesen der Datei: ' + err.message); }
+  };
+  reader.readAsText(file);
+}
+
+async function loadFromURL() {
+  try {
+    const res = await fetch('https://klimanrw.de/productData.json');
+    products = await res.json();
+    showProductList();
+  } catch(err) { alert('Fehler beim Laden: ' + err.message); }
+}
+
+function showProductList() {
+  document.getElementById('startScreen').classList.add('hidden');
+  document.getElementById('productList').classList.remove('hidden');
+  document.getElementById('productEditor').classList.add('hidden');
+  document.getElementById('headerBtns').classList.add('hidden');
+  renderProductList();
+}
+
+function renderProductList() {
+  const el = document.getElementById('productItems');
+  const h = document.querySelector('#productList h2');
+  h.textContent = `Produkte (${products.length})`;
+  el.innerHTML = products.map((p, i) => `
+    <div class="product-item">
+      <div class="info">
+        <strong>ID ${p.id}</strong> - ${p.name.replace(/<br\s*\/?>/g, ' | ')}
+        <div class="meta">ab ${p.price} € | ${p.brand} | ${p.category}</div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-primary btn-sm" onclick="editProduct(${i})">Bearbeiten</button>
+        <button class="btn btn-red btn-sm" onclick="deleteProduct(${i})">Löschen</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function deleteProduct(index) {
+  if(!confirm('Produkt "' + products[index].name.replace(/<[^>]*>/g,'') + '" wirklich löschen?')) return;
+  products.splice(index, 1);
+  renderProductList();
+}
+
+function addProduct() {
+  const maxId = products.reduce((m, p) => Math.max(m, p.id), 0);
+  products.push({
+    id: maxId + 1, name: "Neues Produkt <br> 1/2/3 Geräte", image: [], category: "Standard",
+    brand: "Marke", wifi: "Verfügbar", price: 0, technical_image: "", features: [], description: "",
+    pricing: {
+      basePrices: {},
+      roomSizeCosts: {"35m²": 0, "55m²": 0, "75m²": 0},
+      locationCosts: {floor: 0, "wall-up-to-2.50m": 45, "wall-over-2.50m": 100},
+      additionalOptions: [
+        {key:"dacharbeiten",label:"Dacharbeiten",price:250},
+        {key:"assemblyWithin7Days",label:"Montage innerhalb von 7 Tagen",price:100},
+        {key:"rubberFeet",label:"Gummifüße",price:55},
+        {key:"wandconsole",label:"Wandconsole",price:50}
+      ],
+      cableFreeMeterPerRoom: 5, cablePricePerMeter: 50
+    }
+  });
+  editProduct(products.length - 1);
+}
+
+function editProduct(index) {
+  editingIndex = index;
+  document.getElementById('productList').classList.add('hidden');
+  document.getElementById('productEditor').classList.remove('hidden');
+  document.getElementById('headerBtns').classList.remove('hidden');
+  document.getElementById('headerBtns').style.display = 'flex';
+  renderEditor();
+}
+
+function backToList() {
+  saveEditorToProduct();
+  editingIndex = -1;
+  showProductList();
+}
+
+function saveEditorToProduct() {
+  if (editingIndex < 0) return;
+  const f = document.getElementById('productEditor');
+  const p = products[editingIndex];
+  p.name = f.querySelector('#ed-name').value;
+  p.price = parseInt(f.querySelector('#ed-price').value) || 0;
+  p.brand = f.querySelector('#ed-brand').value;
+  p.category = f.querySelector('#ed-category').value;
+  p.wifi = f.querySelector('#ed-wifi').value;
+  p.image = f.querySelector('#ed-images').value.split(',').map(s=>s.trim()).filter(Boolean);
+  p.technical_image = f.querySelector('#ed-techimg').value;
+  p.description = f.querySelector('#ed-desc').value;
+  p.features = f.querySelector('#ed-features').value.split('\n').filter(Boolean);
+
+  if(!p.pricing) p.pricing = {};
+
+  // basePrices
+  const bp = {};
+  f.querySelectorAll('[data-bp-key]').forEach(el => {
+    if(el.value !== '') bp[el.dataset.bpKey] = parseInt(el.value) || 0;
+  });
+  p.pricing.basePrices = Object.keys(bp).length > 0 ? bp : undefined;
+
+  // roomSizeCosts
+  const rc = {};
+  f.querySelectorAll('[data-rc-key]').forEach(el => { rc[el.dataset.rcKey] = parseInt(el.value) || 0; });
+  p.pricing.roomSizeCosts = rc;
+
+  // locationCosts
+  const lc = {};
+  f.querySelectorAll('[data-lc-key]').forEach(el => { lc[el.dataset.lcKey] = parseInt(el.value) || 0; });
+  p.pricing.locationCosts = lc;
+
+  // additionalOptions
+  const opts = [];
+  f.querySelectorAll('.opt-row').forEach(row => {
+    const label = row.querySelector('.opt-label').value;
+    const price = parseInt(row.querySelector('.opt-price').value) || 0;
+    const key = row.dataset.optKey || ('option_' + Date.now() + Math.random());
+    if(label) opts.push({key, label, price});
+  });
+  p.pricing.additionalOptions = opts;
+
+  p.pricing.cableFreeMeterPerRoom = parseInt(f.querySelector('#ed-cable-free').value) || 5;
+  p.pricing.cablePricePerMeter = parseInt(f.querySelector('#ed-cable-price').value) || 50;
+}
+
+function renderEditor() {
+  const p = products[editingIndex];
+  const pr = p.pricing || {};
+  const bp = pr.basePrices || {};
+  const rc = pr.roomSizeCosts || {"35m²":0,"55m²":0,"75m²":0};
+  const lc = pr.locationCosts || {floor:0,"wall-up-to-2.50m":45,"wall-over-2.50m":100};
+  const opts = pr.additionalOptions || [];
+
+  const basePriceConfigs = [
+    ["35m²","1x 35m²"],["55m²","1x 55m²"],["75m²","1x 75m²"],
+    ["35m²+35m²","2x 35m²"],["35m²+55m²","35m² + 55m²"],["35m²+75m²","35m² + 75m²"],
+    ["55m²+55m²","2x 55m²"],["55m²+75m²","55m² + 75m²"],["75m²+75m²","2x 75m²"],
+    ["35m²+35m²+35m²","3x 35m²"],["35m²+35m²+55m²","2x 35m² + 55m²"],
+    ["35m²+35m²+75m²","2x 35m² + 75m²"],["35m²+55m²+55m²","35m² + 2x 55m²"],
+    ["35m²+55m²+75m²","35m² + 55m² + 75m²"],["55m²+55m²+55m²","3x 55m²"]
+  ];
+
+  const locLabels = {"floor":"Boden","wall-up-to-2.50m":"Wand (bis 2,50m)","wall-over-2.50m":"Wand (über 2,50m)"};
+
+  document.getElementById('productEditor').innerHTML = `
+    <div class="card">
+      <h2 style="font-size:20px;margin-bottom:16px;">Produkt bearbeiten (ID: ${p.id})</h2>
+
+      <div class="section">
+        <h3>Grunddaten</h3>
+        <label>Name (HTML erlaubt, z.B. &lt;br&gt;)</label>
+        <input id="ed-name" value="${esc(p.name)}">
+        <label>Grundpreis (1 Gerät, 35m²)</label>
+        <input id="ed-price" type="number" value="${p.price}">
+        <div class="grid-2">
+          <div><label>Marke</label><input id="ed-brand" value="${esc(p.brand)}"></div>
+          <div><label>Kategorie</label><input id="ed-category" value="${esc(p.category)}"></div>
+        </div>
+        <label>WLAN</label>
+        <select id="ed-wifi">
+          <option ${p.wifi==='Verfügbar'?'selected':''}>Verfügbar</option>
+          <option ${p.wifi==='Nicht verfügbar'?'selected':''}>Nicht verfügbar</option>
+          <option ${p.wifi==='Inklusive'?'selected':''}>Inklusive</option>
+        </select>
+        <label>Bilder (Dateinamen, kommagetrennt)</label>
+        <input id="ed-images" value="${esc(Array.isArray(p.image)?p.image.join(', '):p.image||'')}">
+        <label>Technisches Bild</label>
+        <input id="ed-techimg" value="${esc(p.technical_image||'')}">
+        <label>Beschreibung</label>
+        <textarea id="ed-desc" rows="3">${esc(p.description||'')}</textarea>
+        <label>Features (eins pro Zeile)</label>
+        <textarea id="ed-features" rows="4">${esc((p.features||[]).join('\n'))}</textarea>
+      </div>
+
+      <div class="section">
+        <h3>Grundpreise nach Konfiguration</h3>
+        <p style="font-size:12px;color:#888;margin-bottom:12px;">Leer = automatisch (Grundpreis + Aufpreis). Zahl eingeben = fester Preis für diese Kombination.</p>
+        ${basePriceConfigs.map(([key,label]) => `
+          <div class="row">
+            <span class="label">${label}:</span>
+            <input type="number" data-bp-key="${key}" value="${bp[key]!==undefined?bp[key]:''}" placeholder="auto" style="width:110px;margin:0;">
+            <span class="unit">€</span>
+          </div>
+        `).join('')}
+      </div>
+
+      <div class="section">
+        <h3>Zimmergrößen-Aufpreis (Fallback)</h3>
+        <p style="font-size:12px;color:#888;margin-bottom:12px;">Nur wenn kein fester Grundpreis definiert ist.</p>
+        ${Object.entries(rc).map(([size,cost]) => `
+          <div class="row">
+            <span class="label">${size}:</span>
+            <input type="number" data-rc-key="${size}" value="${cost}" style="width:110px;margin:0;">
+            <span class="unit">€</span>
+          </div>
+        `).join('')}
+      </div>
+
+      <div class="section">
+        <h3>Standort Außeneinheit</h3>
+        ${Object.entries(lc).map(([key,cost]) => `
+          <div class="row">
+            <span class="label">${locLabels[key]||key}:</span>
+            <input type="number" data-lc-key="${key}" value="${cost}" style="width:110px;margin:0;">
+            <span class="unit">€</span>
+          </div>
+        `).join('')}
+      </div>
+
+      <div class="section">
+        <h3>Zusatzoptionen</h3>
+        <div id="optsContainer">
+          ${opts.map((opt,i) => `
+            <div class="row opt-row" data-opt-key="${esc(opt.key)}">
+              <input class="opt-label" value="${esc(opt.label)}" placeholder="Name" style="flex:1;margin:0;">
+              <input class="opt-price" type="number" value="${opt.price}" style="width:90px;margin:0;">
+              <span class="unit">€</span>
+              <button class="btn btn-red btn-sm" onclick="this.parentElement.remove()" style="padding:4px 10px;">X</button>
+            </div>
+          `).join('')}
+        </div>
+        <button class="btn btn-green btn-sm" onclick="addOption()" style="margin-top:8px;">+ Option hinzufügen</button>
+      </div>
+
+      <div class="section">
+        <h3>Kabel</h3>
+        <div class="grid-2">
+          <div><label>Frei-Meter pro Raum</label><input id="ed-cable-free" type="number" value="${pr.cableFreeMeterPerRoom||5}"></div>
+          <div><label>Preis pro Extra-Meter (€)</label><input id="ed-cable-price" type="number" value="${pr.cablePricePerMeter||50}"></div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:16px;">
+        <button class="btn btn-primary" style="flex:1;font-size:16px;" onclick="saveAndBack()">Speichern & Zurück</button>
+        <button class="btn btn-red" onclick="deleteAndBack(${editingIndex})">Löschen</button>
+      </div>
+    </div>
+  `;
+}
+
+function addOption() {
+  const c = document.getElementById('optsContainer');
+  const div = document.createElement('div');
+  div.className = 'row opt-row';
+  div.dataset.optKey = 'option_' + Date.now();
+  div.innerHTML = `
+    <input class="opt-label" value="Neue Option" placeholder="Name" style="flex:1;margin:0;">
+    <input class="opt-price" type="number" value="0" style="width:90px;margin:0;">
+    <span class="unit">€</span>
+    <button class="btn btn-red btn-sm" onclick="this.parentElement.remove()" style="padding:4px 10px;">X</button>
+  `;
+  c.appendChild(div);
+}
+
+function saveAndBack() {
+  saveEditorToProduct();
+  showProductList();
+}
+
+function deleteAndBack(index) {
+  if(!confirm('Produkt wirklich löschen?')) return;
+  products.splice(index, 1);
+  editingIndex = -1;
+  showProductList();
+}
+
+function downloadJSON() {
+  if(editingIndex >= 0) saveEditorToProduct();
+  const json = JSON.stringify(products, null, 2);
+  const blob = new Blob([json + '\n'], {type: 'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'productData.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+
+</body>
+</html>
